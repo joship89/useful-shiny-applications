@@ -1,5 +1,6 @@
-# library(ROAuth)
-# library(twitteR)
+library(ROAuth)
+library(twitteR)
+library(syuzhet)
 
 server <- function(input, output) {
 
@@ -14,17 +15,22 @@ server <- function(input, output) {
   output$table <- renderDataTable({
      TweetFrame<-function(searchTerm, maxTweets)
      {
+       searchTerm <- "sachin"
+       maxTweets <- 100
      
        twtList <- searchTwitter(searchTerm,n=maxTweets)
        twtList1 <- do.call("rbind",lapply(twtList,as.data.frame))
        twtList1$text <- iconv(twtList1$text, 'UTF-8', 'ASCII') #WILL THIS SOLVE THE UTF ENCODING PROBLEM: http://lists.hexdump.org/pipermail/twitter-users-hexdump.org/2013-May/000335.html
+       twtList1$sentiment <- get_sentiment(twtList1$text, method = "syuzhet")
        return(twtList1)
        
      }
      entity1 <- reactive({
        entity1 <- TweetFrame(input$handle, input$maxTweets)
        })
-    output$table <- renderDataTable({tab<-entity1()[1]})
+    output$table <- renderDataTable({
+      tab<-entity1()[,c(1,20)]
+      })
     output$download <- downloadHandler(filename = function() {paste(input$handle, '.csv', sep='')},
                                         content = function(file){
                                           write.csv(entity1(), file)
