@@ -18,7 +18,6 @@ https://prasannajoshi.shinyapps.io/currency-exchange-rate-tracker2/
 
 ## Notes
 
-- The app will be extended in the future to include conversion rates for other currencies.
 - Email notifications upon convergence and divergence of moving averages will be tested.
 
 
