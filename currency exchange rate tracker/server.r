@@ -1,41 +1,60 @@
-library(ROAuth)
-library(twitteR)
-library(syuzhet)
-library(streamR)
-library(rtweet)
+library(dplyr)
+library(shiny)
+library(data.table)
+library(ggplot2)
+library(quantmod)
+library(curl)
+library(rsconnect)
+library(shinytoastr)
 
+# 
+# source("http://bioconductor.org/biocLite.R")
+# devtools::install_github("joshuaulrich/quantmod@144_getFX")
+# setwd("~/Documents/extras/github-projects/useful shiny applications/currency exchange rate tracker/currency-exchange-rate-tracker2")
 
-server <- function(input, output) {
-
-  consumer.key <- "qFceZASMHsZ5RiLNTgjR1V1Tb"
-  consumer.secret <- "6Ab0LtLOS2qZgEqOm7qFAxpglnI8rrK4cD9mU825hxBPwvDF9M"
-  access.token <- "116723960-DtdqkWGzn1O9CIlCcA8T1imUJzZvJSgRvIrkCfay"
-  access.token.secret <- "JAh0Rf70iRE90t8Aa54k01GBDhSUNl0vdrkazrUjpBnKU"
+shinyServer(function(input, output) {
+  # toastr_success("Application Started")
   
-  setup_twitter_oauth(consumer_key = consumer.key, consumer_secret = consumer.secret, access_token = access.token, access_secret = access.token.secret)
-  
-  output$table <- renderDataTable({
-     TweetFrame<-function(searchTerm, maxTweets)
-     {
-       twtList <- searchTwitter(searchTerm,n=maxTweets)
-       twtList1 <- do.call("rbind",lapply(twtList,as.data.frame))
-       twtList1$text <- iconv(twtList1$text, 'UTF-8', 'ASCII') #WILL THIS SOLVE THE UTF ENCODING PROBLEM: http://lists.hexdump.org/pipermail/twitter-users-hexdump.org/2013-May/000335.html
-       twtList1$sentiment <- get_sentiment(twtList1$text, method = "syuzhet")
-       twtList1 <- twtList1[!(is.na(twtList1$text)),]
-       return(twtList1)
-       
-     }
-     
-     entity1 <- reactive({
-       entity1 <- TweetFrame(input$handle, input$maxTweets)
-       })
-    output$table <- renderDataTable({
-      tab<-entity1()[,c(1,20)]
-      })
+  output$maPlot <- renderPlot({
     
-    output$download <- downloadHandler(filename = function() {paste(input$handle, '.csv', sep='')},
-                                        content = function(file){
-                                          write.csv(entity1(), file)
-                                        })
-  })
-}
+    currencies <- paste0("USD/",input$currency)
+    to.date <- Sys.Date() 
+    from.date <-  to.date - 149 
+      
+    # get conversion rates for the time interval
+    
+    getFX(currencies,
+          from = from.date, to = to.date,
+          env = .GlobalEnv,
+          verbose = FALSE,
+          warning = TRUE,
+          auto.assign = TRUE)
+    curr.time.series <- setDT(as.data.frame(get(paste0("USD",input$currency))), keep.rownames = TRUE)[]
+    colnames( curr.time.series) <- c("Date","Rate")
+    curr.time.series <-  curr.time.series %>% arrange(desc(Date))
+    
+    # Calculate moving averages: 
+    curr.time.series.abs <- data.frame(curr.time.series$Date[1:30], as.data.frame( curr.time.series$Rate)[1:30,])
+    curr.time.series.30.ma <- data.frame(curr.time.series$Date[1:30], as.data.frame(rollmean(curr.time.series$Rate, 30))[1:30,])
+    curr.time.series.60.ma <- data.frame(curr.time.series$Date[1:30], rollmean( curr.time.series$Rate, 60)[1:30]) 
+    curr.time.series.90.ma <- data.frame(curr.time.series$Date[1:30], as.data.frame(rollmean( curr.time.series$Rate, 90))[1:30,]) 
+    moving.averages <- data.frame( curr.time.series.abs[,1], curr.time.series.30.ma[,2],  curr.time.series.60.ma[,2],  curr.time.series.90.ma[,2],  curr.time.series.abs[,2]) 
+    colnames(moving.averages) <- c("Date", "30 Day", "60 Day", "90 Day","Current")
+    
+    # line plots of moving averages
+    ma.plot <- ggplot(data=moving.averages, 
+      aes(x=Date, y=`30 Day`, group=1)) + 
+      geom_line(color="green4") +
+      geom_line(aes(y = `60 Day`), colour="darkolivegreen3") +
+      geom_line(aes(y = `90 Day`), colour="darkolivegreen1") +
+      geom_line(aes(y = `Current`), colour="black") +
+      ggtitle('Currency Moving Averages ') + 
+      ylab(input$currency) +
+      xlab("") +
+      theme_bw() + 
+      theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+      theme(axis.title=element_text(face="bold", size="12", color="darkgreen"))
+
+    plot(ma.plot)
+    })
+})
