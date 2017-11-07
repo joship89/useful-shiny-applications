@@ -1,7 +1,10 @@
+# To enable authentication in shiny server, user needs to update the subscription to
+# a standard plan or higher. The following is a way to embed password authentication using the
+# validate() function.
 
 library(shiny)
 
-# Define UI for application that draws a histogram
+# UI for an application to generate a plot using Old Failthful Geyser Data:
 ui <- fluidPage(
   passwordInput("password", "Password:"),
   actionButton("go", "Go"),
@@ -9,7 +12,6 @@ ui <- fluidPage(
    # Application title
    titlePanel("Old Faithful Geyser Data"),
    
-   # Sidebar with a slider input for number of bins 
    sidebarLayout(
       sidebarPanel(
          sliderInput("bins",
@@ -19,19 +21,22 @@ ui <- fluidPage(
                      value = 30)
       ),
       
-      # Show a plot of the generated distribution
+
       mainPanel(
          plotOutput("distPlot")
       )
    )
 )
 
-# Define server logic required to draw a histogram
+# Server Logic:
 server <- function(input, output) {
    
    output$distPlot <- renderPlot({
-      # generate bins based on input$bins from ui.R
-     
+      
+# Use Validate() function to test the condition that the supplied password is correct.
+# Error message "Incorrect Password" is signaled which stops execution
+
+
      validate(
        need(input$password == 1234, "Incorrect Password")
      )
